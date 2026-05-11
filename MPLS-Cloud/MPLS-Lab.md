@@ -37,13 +37,31 @@ configure terminal
 ## Phase 2: Basic MPLS Configuration
 ### Commands
 ```
-ip cef --> CEF(Cisco Express Forwarding) - L3 switching technology to increase network speed and scalability
+ip cef --> CEF(Cisco Express Forwarding) - L3 switching technology to increase network speed and scalability.
+mpls ip --> enables Multiprotocol Label Switching (MPLS) forwarding for IPv4/IPv6 packets on an interface.
 ```
-### R4: PE-SanJuan
-```
+### R4: PE-San Juan
+configure terminal
+ ip cef
+ mpls ip
+  interface Ethernet 1/2
+  mpls ip
+  mpls label protocol ldp
+  mpls mtu override 1512
+
+### R4: PCore-SanJuan
 configure terminal
  ip cef  
  mpls ip
+  interface Ethernet 1/1
+   mpls ip
+   mpls label protocol ldp
+   !mpls mtu override 1512
+   exit
+  interface Ethernet 1/2
+   mpls ip
+   mpls label protocol ldp
+   mpls mtu override 1512
  
 
 
