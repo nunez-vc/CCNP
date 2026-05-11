@@ -48,8 +48,9 @@ configure terminal
   mpls ip
   mpls label protocol ldp
   mpls mtu override 1512
-
+```
 ### R4: PCore-SanJuan
+```
 configure terminal
  ip cef  
  mpls ip
@@ -62,7 +63,8 @@ configure terminal
    mpls ip
    mpls label protocol ldp
    mpls mtu override 1512
- 
+ ```
+
 
 
 
