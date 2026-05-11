@@ -1,4 +1,4 @@
-# 🏗️ MPLS Cloud Lab - Device Pre-Configurations
+# ☁️ MPLS Cloud Lab - Device Pre-Configurations
 
 *Last Updated: 2026-05-11*  
 *Lab Environment: CCNP MPLS Cloud Lab*  
