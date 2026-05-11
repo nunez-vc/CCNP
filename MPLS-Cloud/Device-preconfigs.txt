@@ -7,6 +7,78 @@ Lab Environment: CCNP MPLS Cloud Lab
 Purpose: Store device pre-configurations for MPLS lab deployments
 
 ================================================================================
-                                ALL DEVICES
+                                   ALL DEVICES
 ================================================================================
+
+conf t
+ enable secret pass
+ no logging con
+ no ip domain-lookup
+ line con 0
+  exe-timeout 0 0
+  exit
+line vty 0 4
+ no login
+ exec-timeout 0 0
+ transport input all
+ exit
+
+================================================================================
+                                  BPO - SAN JUAN
+================================================================================
+
+conf t
+ hostname BPO-SanJuan
+ ip host sanjuan.BPO.net 10.1.1.1  --> this creates a local hostname-to-IP mapping
+ ip host makati.BPO.net 10.1.1.5
+ int e0/0
+  ip add 10.1.1.1
+  no shut
+ end
+wr
+
+================================================================================
+                                  PNB - SAN JUAN
+================================================================================
+conf t
+ hostname PNB-Alabang
+ ip host sanjuan.PNB.net 10.1.1.1 
+ ip host makati.PNB.net 10.1.1.5
+ int e1/1
+  ip add 10.1.1.1 255.255.255.252
+  no shut
+ end
+wr
+
+================================================================================
+                                  BPI - SAN JUAN
+================================================================================
+conf t
+ hostname BPI-Alabang
+ ip host sanjuan.BPI.net 10.1.1.1 
+ ip host makati.BPI.net 10.1.1.5
+ int e1/1
+  ip add 10.1.1.1 255.255.255.252
+  no shut
+ end
+wr
+
+================================================================================
+                                  BSP - SAN JUAN
+================================================================================
+conf t
+ hostname BSP-Alabang
+ ip host sanjuan.BSP.net 10.1.1.1 
+ ip host makati.BSP.net 10.1.1.5
+ int e0/1
+  ip add 10.1.1.1 255.255.255.252
+  no shut
+ end
+wr
+
+
+
+
+
+
 
