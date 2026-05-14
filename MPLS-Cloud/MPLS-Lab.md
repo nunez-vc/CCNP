@@ -87,7 +87,7 @@ configure terminal
    mpls label protocol ldp
    mpls mtu override 1512
 ```
-### How to check:
+### How to verify:
 ```
 R2#show mpls ldp neighbor (lib)
     Peer LDP Ident: 172.16.1.1:0; Local LDP Ident 172.16.1.2:0
@@ -185,19 +185,19 @@ configure terminal
   rd 888:5
   route-target 69666:5
 ```
-### How to Check
+### How to verify:
 ```
 R4#show ip vrf
   Name                             Default RD          Interfaces
-  clientBDOa                       999:1               
-  clientBPIa                       999:2               
-  clientPNBa                       999:3               
+  clientBDOsanjuan                 999:1               
+  clientBPIsanjuan                 999:2               
+  clientPNBsanjuan                 999:3               
 
 R1#show ip vrf
   Name                             Default RD          Interfaces
-  clientBDOb                       999:1               
-  clientBPIb                       999:2               
-  clientPNBb                       999:3    
+  clientBDOmakati                  999:1               
+  clientBPImakati                  999:2               
+  clientPNBmakati                  999:3    
 ```
 
 ## Phase 4: Configuring VRF interfaces on Provider Edge Routers
@@ -243,7 +243,7 @@ configure terminal
    no shut
 end
 ```
-### How to check:
+### How to verify:
 ```
 R1#sh ip int br
 Interface                  IP-Address      OK? Method Status                Protocol
@@ -255,3 +255,286 @@ Loopback0                  172.16.1.1      YES manual up                    up
 
 Note: Make sure Real routers, can ping Virtual Routers!
 ```
+
+## Phase 5: MP-BGP Configuration Multiprotocol BGP
+```
+BGP (handles 32bits:normal packet) vs mBGP(multi Protocol BGP = 96bits= 32 + 64bits RD)
+```
+### R4: PE-SanJuan
+```
+configure terminal
+ no router bgp 64999
+ router bgp 64999
+  !kill normal BGP, enable mBGP
+  no bgp default ipv4-unicast
+  neighbor 172.16.1.1 remote-as 64999
+  neighbor 172.16.1.1 update-source lo0
+  address-family vpnv4
+  neighbor 172.16.1.1 activate
+  neighbor 172.16.1.1 send-community both
+  exit-address-family
+  !activate the neighbor and exchange vpnv4 routes (32+64)
+```
+### R1: PE-Makati peering with lo of R2
+```
+configure terminal
+ no router bgp 64999
+ router bgp 64999
+ no bgp default ipv4-unicast
+ !disables IPv4 routing to handle VPN routes
+ neighbor 172.16.1.4 remote-as 64999
+ neighbor 172.16.1.4 update-source lo0
+ address-family vpnv4
+ neighbor 172.16.1.4 activate
+ neighbor 172.16.1.4 send-community both
+ exit-address-family
+ !activate the neighbor and exchange vpnv4 routes (32+64)
+```
+### How to verify:
+```
+show ip bgp neighbors 172.16.1.3
+PE-A#show ip bgp vpnv4 all summary 
+For address family: VPNv4 Unicast
+BGP router identifier 172.16.1.4, local AS number 64999
+BGP table version is 7, main routing table version 7
+4 network entries using 624 bytes of memory
+4 path entries using 336 bytes of memory
+4/4 BGP path/bestpath attribute entries using 672 bytes of memory
+4 BGP extended community entries using 580 bytes of memory
+0 BGP route-map cache entries using 0 bytes of memory
+0 BGP filter-list cache entries using 0 bytes of memory
+BGP using 2212 total bytes of memory
+BGP activity 4/0 prefixes, 4/0 paths, scan interval 60 secs
+
+Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+172.16.1.1      4        64999      18      18        7    0    0 00:13:11        2
+```
+
+## Phase 6: Individual Virtual/Logical Router VRF Configuration
+### R4: PE-SanJuan
+```
+Note: Logical router of PNB = clientPNBSanJuan/Makati
+
+configure terminal
+ router eigrp 90
+  address-family ipv4 vrf clientPNBsanjuan
+  autonomous-system 90
+  network 10.0.0.0
+  no auto-summary
+  end
+```
+### R1: PE-Makati
+```
+configure terminal
+ router eigrp 90
+  address-family ipv4 vrf clientPNBmakati
+  autonomous-system 90
+  network 10.0.0.0
+  no auto-summary
+  end
+```
+### R4: PE-SanJuan
+```
+Note: Logical Router of BPI = clientBPIsanjuan/makati
+
+configure terminal
+ router ospf 69 vrf clientBPIsanjuan
+ network 0.0.0.0 0.0.0.0 area 0
+ end
+```
+### R1: PE-Makati
+```
+configure terminal
+ router ospf 69 vrf clientBPImakati
+ network 0.0.0.0 0.0.0.0 area 0
+ end
+```
+
+## Phase 7: Route Redistributions
+```
+RIP - mBGP-RIP/EIRGP-mBGP - EIGRP/OSPF - mBGP - OSPF
+```
+## Phase 7.1: EIGRP - mBGP - EIGRP
+### R4: PE-SanJuan
+```
+configure terminal
+ router bgp 64999
+  address-family ipv4 vrp clientPNBsanjuan
+  redistribute eigrp 90 metric 1
+  exit
+ router eigrp 90
+  address-family ipv4 vrf clientPNBsanjuan
+  autonomous-system 90
+  network 10.0.0.0
+  no auto-summary
+  redistribute bgp 64999 metric 100000 10 1 255 1512
+  !seed metric, sh int fa1/2 ; bw de/10 load rely mtu
+  exit-address-family
+```
+### R1: PE-Makati
+```
+configure terminal
+ router bgp 64999
+  address-family ipv4 vrf clientPNBmakati
+  redistribute eigrp 90 metric 1
+  exit
+ router eigrp 90
+  address-family ipv4 vrf clientPNBmakati
+  autonomous-system 90
+  network 10.0.0.0
+  no auto-summary
+  redistribute bgp 64999 metric 100000 10 1 255 1512
+  exit-address-family
+```
+## Phase 7.2: OSPF - mBGP - OSPF
+### R4: PE-SanJuan
+```
+configure terminal
+ router bgp 64999
+  address-family ipv4 vrf clientBPIsanjuan
+  no redistribute ospf 1
+  redistribute ospf 69
+  no auto-summary
+  exit
+ router bgp 64999
+  redistribute bgp 64999 metric-type 1 subnets
+  network 0.0.0.0 0.0.0.0 area 0
+  end
+```
+### P1: PE-Makati
+```
+configure terminal
+ router bgp 64999
+  address-family ipv4 vrf clientBPImakati
+  no redistribute ospf 1
+  redistribute ospf 69
+  no auto-sumary
+  exit
+ router ospf 69 vrf clientBPImakati
+  redistribute bgp 64999 metric-type 1 subnets
+  network 0.0.0.0 0.0.0.0 area 0
+  end
+```
+
+## Phase 8: IGP Configuration on Clients
+### On all PNB (EIGRP) Routers:
+```
+configure terminal
+ router eigrp 90
+  network 10.0.0.0
+  no auto-summary
+```
+### On all BPI (OSPF) Routers:
+```
+configure terminal
+ no router ospf 1
+ router ospf 69
+  network 0.0.0.0 0.0.0.0 area 0
+```
+
+## Phase 9: VPNs on Clients
+```
+Task: Create a site to site ipsec VPN tunnel between siteA with WAN of 10.1.1.1/30 and LAN A one of 172.16.10.1/24 and siteB with WAN of 10.1.1.5/30 and LAN B of 172.16.20.1/24.
+
+IKE Phase 1 – Routers exchange keys securely (like a private handshake).
+IKE Phase 2 – They agree on how to encrypt real data (the “data tunnel”).
+Crypto Map – Tells router which traffic to encrypt (based on ACL).
+IPsec SA (Security Association) – The live, active tunnel where packets get encrypted.
+Encapsulation – Each packet from LAN A → LAN B gets wrapped (encrypted) before it leaves the WAN.
+```
+
+### PNB-SanJuan
+```
+configure terminal
+ hostname PNBsanjuan
+ interface Ethernet1/1
+  description WAN to SiteB
+  ip address 10.1.1.1 255.255.255.252
+  no shutdown
+  exit
+ interface Ethernet0/1
+  description LAN A
+  ip address 172.16.10.1 255.255.255.0
+  no shutdown
+  exit
+ ip route 0.0.0.0 0.0.0.0 10.1.1.2  --> Default route to internet
+ access-list 110 permit ip 171.16.10.0 0.0.0.255 172.16.20.0 0.0.0.255
+ crypto isakmp policy 10
+  encrpytion aes
+  hash sha256
+  authentication pre-share
+  group 14
+  lifetime 86400
+ crypto isakmp key VPN123 address 10.1.1.5
+ crypto ipsec transform-set MYSET esp-aes esp-sha-hmac
+  mode tunnel
+ crypto map VPN-MAP 10 ipsec-isakmp
+  set peer 10.1.1.5
+  set transform-set MYSET
+  match address 110
+  exit
+ interface Ethernet1/1
+  crypto map VPN-MAP
+  exit
+ ip route 172.16.20.0 255.255.255.0 10.1.1.5
+ end
+```
+### How to verify:
+```
+PNBsanjuan#show crypto isakmp sa
+IPv4 Crypto ISAKMP SA
+dst             src             state          conn-id status
+10.1.1.5        10.1.1.1        QM_IDLE           1001 ACTIVE
+```
+### PNB-Makati
+```
+configure terminal
+ hostname PNBmakati
+ interface Ethernet1/3
+  description WAN to SiteA
+  ip address 10.1.1.5  255.255.255.252
+  no shutdown
+  exit
+ interface Ethernet1/0
+  description to LAN B
+  ip address 172.16.20.1 255.255.255.0
+  no shutdown
+  exit
+ ip route 0.0.0.0 0.0.0.0 10.1.1.6 --> Default route to internet
+ access-list 110 permit ip 172.16.20.0 0.0.0.255 172.16.10.0 0.0.0.255
+ crypto isakmp policy 10
+  encrpytion aes
+  hash sha256
+  authentication pre-share
+  group 14
+  lifetime 86400
+ crypto isakmp key VPN123 address 10.1.1.1
+ crypto ipsec transform-set MYSET esp-aes esp-sha-hmac
+  mode tunnel
+ crypto map VPAN-MAP 10 ipsec-isakmp
+  set peer 10.1.1.1
+  set transform-set MYSET
+  match address 110
+ interface Ethernet 1/3
+  crypto map VPN-MAP
+ ip route 172.16.10.0 255.255.255.0 10.1.1.1
+ end
+```
+### How to Verify:
+```
+PNBmakati#show crypto isakmp sa
+IPv4 Crypto ISAKMP SA
+dst             src             state          conn-id status
+10.1.1.5        10.1.1.1        QM_IDLE           1001 ACTIVE
+```
+
+
+
+
+
+
+
+
+
+
+
