@@ -527,8 +527,37 @@ IPv4 Crypto ISAKMP SA
 dst             src             state          conn-id status
 10.1.1.5        10.1.1.1        QM_IDLE           1001 ACTIVE
 ```
-
-
+## GRE site-to-site VPN setup
+```
+Classic CCNP-level “GRE over IPsec” site-to-site VPN setup. It combines GRE (Generic Routing Encapsulation) and IPsec encryption so that: You get routing protocols + multiprotocol support via GRE, and encryption/authentication via IPsec:
+```
+### BPI-SanJuan
+```
+configure terminal
+ hostname BPIsanjuan
+ description WAN to Makati
+ interface Ethernet1/1
+  ip address 10.1.1.1 255.255.255.252
+  no shutdown
+  exit
+ interface Ethernet1/0
+  description LAN A
+  ip address 172.16.10.1 255.255.255.0
+  no shutdown
+  exit
+ ip route 0.0.0.0 0.0.0.0 10.1.1.2 --> Default route to Internet
+ !Configure GRE Tunnel
+ interface tunnel 10
+  description GRE Tunnel to Makati
+  ip address 192.168.100.1 255.255.255.252
+  ip mtu 1400
+  tunnel source 10.1.1.1
+  tunnel destination 10.1.1.5
+  keepalive 10 3
+  no shutdown
+  exit
+ access-list 110 permit gre host 10.1.1.1 host 10.1.1.5  
+```
 
 
 
