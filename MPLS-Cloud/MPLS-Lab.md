@@ -442,7 +442,6 @@ Crypto Map – Tells router which traffic to encrypt (based on ACL).
 IPsec SA (Security Association) – The live, active tunnel where packets get encrypted.
 Encapsulation – Each packet from LAN A → LAN B gets wrapped (encrypted) before it leaves the WAN.
 ```
-
 ### PNB-SanJuan
 ```
 configure terminal
@@ -546,7 +545,11 @@ configure terminal
   no shutdown
   exit
  ip route 0.0.0.0 0.0.0.0 10.1.1.2 --> Default route to Internet
- !Configure GRE Tunnel
+ end
+```
+### Configure GRE Tunnel in BPI-SanJuan
+```
+configure terminal
  interface tunnel 10
   description GRE Tunnel to Makati
   ip address 192.168.100.1 255.255.255.252
@@ -557,6 +560,51 @@ configure terminal
   no shutdown
   exit
  access-list 110 permit gre host 10.1.1.1 host 10.1.1.5  
+```
+### Configure ISAKMP (IKE Phase 1) in BPI-SanJuan
+```
+configure terminal
+ crypto isakmp policy 10
+  encryption aes
+  hash sha256
+  authentication pre-share
+  group 14
+  lifetime 86400
+ crypto isakmp key GREVPN123 address 10.1.1.5
+ end
+ ```
+### Define the IPsec Transform Set (Phase 2) in BPI-SanJuan
+```
+configure terminal
+ crypto ipsec transform-set GRE-SET esp-aes esp-sha-hmac
+  mode transport
+ crypto map GRE-MAP 10 ipsec-isakmp
+  set peer 10.1.1.5
+  set transform-set GRE-SET
+  match address 110
+ interface Ethernet1/1
+  crypto map GRE-MAP
+  exit
+!Now, GRE traffic between 10.1.1.1 and 10.1.1.5 will be encrypted by IPsec.
+!Do static routing or dynamic routing protocols like OSPF, but for this one we will use static routing for simplicity
+ ip route 172.16.20.0 255.255.255.0 192.168.100.2
+```
+
+### BPI-Makati
+```
+configure terminal
+ hostname BPImakati
+ interface Ethernet1/3
+  description WAN to San Juan
+  ip address 10.1.1.5 255.255.255.252
+  no shutdown
+  exit
+ interface Ethernet1/0
+  description LAN B
+  ip address 172.16.20.1 255.255.255.0
+  no shutdown
+  exit
+ ip route 0.0.0.0 0.0.0.0 10.1.1.6 --> Default route to Internet
 ```
 
 
