@@ -270,10 +270,11 @@ configure terminal
   neighbor 172.16.1.1 remote-as 64999
   neighbor 172.16.1.1 update-source lo0
   address-family vpnv4
-  neighbor 172.16.1.1 activate
-  neighbor 172.16.1.1 send-community both
-  exit-address-family
-  !activate the neighbor and exchange vpnv4 routes (32+64)
+   neighbor 172.16.1.1 activate
+   neighbor 172.16.1.1 send-community both
+   exit-address-family
+  ! activate the neighbor and exchange vpnv4 routes (32+64)
+ end
 ```
 ### R1: PE-Makati peering with lo of R2
 ```
@@ -285,10 +286,11 @@ configure terminal
  neighbor 172.16.1.4 remote-as 64999
  neighbor 172.16.1.4 update-source lo0
  address-family vpnv4
- neighbor 172.16.1.4 activate
- neighbor 172.16.1.4 send-community both
- exit-address-family
- !activate the neighbor and exchange vpnv4 routes (32+64)
+  neighbor 172.16.1.4 activate
+  neighbor 172.16.1.4 send-community both
+  exit-address-family
+! activate the neighbor and exchange vpnv4 routes (32+64)
+ end
 ```
 ### How to verify:
 ```
@@ -368,7 +370,7 @@ configure terminal
   network 10.0.0.0
   no auto-summary
   redistribute bgp 64999 metric 100000 10 1 255 1512
-  !seed metric, sh int fa1/2 ; bw de/10 load rely mtu
+  ! seed metric, sh int fa1/2 ; bw de/10 load rely mtu
   exit-address-family
 ```
 ### R1: PE-Makati
@@ -559,7 +561,8 @@ configure terminal
   keepalive 10 3
   no shutdown
   exit
- access-list 110 permit gre host 10.1.1.1 host 10.1.1.5  
+ access-list 110 permit gre host 10.1.1.1 host 10.1.1.5
+ end
 ```
 ### Configure ISAKMP (IKE Phase 1) in BPI-SanJuan
 ```
@@ -578,6 +581,10 @@ configure terminal
 configure terminal
  crypto ipsec transform-set GRE-SET esp-aes esp-sha-hmac
   mode transport
+  end
+```
+### Create and Apply Crypto Map in BPI-SanJuan
+```
  crypto map GRE-MAP 10 ipsec-isakmp
   set peer 10.1.1.5
   set transform-set GRE-SET
@@ -585,9 +592,10 @@ configure terminal
  interface Ethernet1/1
   crypto map GRE-MAP
   exit
-!Now, GRE traffic between 10.1.1.1 and 10.1.1.5 will be encrypted by IPsec.
-!Do static routing or dynamic routing protocols like OSPF, but for this one we will use static routing for simplicity
+! Now, GRE traffic between 10.1.1.1 and 10.1.1.5 will be encrypted by IPsec.
+! Do static routing or dynamic routing protocols like OSPF, but for this one we will use static routing for simplicity
  ip route 172.16.20.0 255.255.255.0 192.168.100.2
+ end
 ```
 
 ### BPI-Makati
@@ -605,13 +613,230 @@ configure terminal
   no shutdown
   exit
  ip route 0.0.0.0 0.0.0.0 10.1.1.6 --> Default route to Internet
+ end
 ```
+### Configure GRE Tunnel in BPI-Makati
+```
+configure terminal
+ interface Tunnel0
+  description GRE Tunnel to San Juan
+  ip address 192.168.100.2 255.255.255.252
+  ip mtu 1400
+  tunnel source 10.1.1.5
+  tunnel destination 10.1.1.1
+  keepalive 10 3
+  no shutdown
+  exit
+ access-list 110 permit gre host 10.1.1.5 host 10.1.1.1
+ end
+```
+### Configure ISAKMP (IKE Phase 1) in BPI-Makati
+```
+configure terminal
+ crypto isakmp policy 10
+  encryption aes
+  hash sha256
+  authentication pre-share
+  group 14
+  lifetime 86400
+  exit
+ crypto isakmp key GREVPN123 address 10.1.1.1
+ end
+```
+### Define the IPsec Transform Set (Phase 2) in BPI-Makati
+```
+configure terminal
+ crypto ipsec transform-set GRE-SET esp-aes esp-sha-hmac
+  mode transport
+  end
+```
+### Create and Apply Crypto Map in BPI-Makati
+```
+configure terminal
+ crypto map GRE-MAP 10 ipsec-isakmp
+  set peer 10.1.1.1
+  set transform-set GRE-SET
+  match address 110
+  exit
+ interface Ethernet1/3
+  crypto map GRE-MAP
+  exit
+! Now, GRE traffic between 10.1.1.1 and 10.1.1.5 will be encrypted by IPsec.
+! Do static routing or dynamic routing protocols like OSPF, but for this one we will use static routing for simplicity
+ ip route 172.16.10.0 255.255.255.0 192.168.100.1
+```
+### How to Verify:
+```
+BPIsanjuan#ping 172.16.20.1 source 172.16.10.1 re 100
+Type escape sequence to abort.
+Sending 100, 100-byte ICMP Echos to 172.16.20.1, timeout is 2 seconds:
+Packet sent with a source address of 172.16.10.1 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+Success rate is 100 percent (100/100), r
+BPIsanjuan#show crypto isakmp sa
+IPv4 Crypto ISAKMP SA
+dst             src             state          conn-id status
+10.1.1.5        10.1.1.1        QM_IDLE           1002 ACTIVE
+10.1.1.1        10.1.1.5        QM_IDLE           1001 ACTIVE
+
+IPv6 Crypto ISAKMP SA
+
+```
+## Virtual Tunnel Interface (VTI) Setup
+```
+Note:
+The modern cisco VPN method: Virtual Tunnel Interface (VTI) IPsec site-to-site VPN.
+VTI is easier and cleaner than crypto maps or GRE/IPsec because:
+a. It acts like a normal interface (with an IP address).
+b. Supports routing protocols (OSPF, BGP, EIGRP) directly.
+c. Simpler configuration and troubleshooting.
+```
+### BSP-SanJuan
+```
+configure terminal
+ hostname BSPsanjuan
+ interface Ethernet0/1
+  description WAN to Makati
+  ip address 10.1.1.1 255.255.255.252
+  no shutdown
+  exit
+ interface Ethernet0/0
+  description LAN A
+  ip address 172.16.10.1 255.255.255.0
+  no shutdown
+  end
+```
+### IKEv2 keying in BSP-SanJuan
+```
+configure terminal
+ crypto ikev2 proposal VTI-PROP
+  encryption aes-cbc-256
+  integrity sha256
+  group 14
+  exit
+ crypto ikev2 policy VTI-POLICY
+  proposal VTI-PROP
+  exit
+ crypto ikev2 keyring VTI-KEYS
+  peer SITEB
+  address 10.1.1.5
+  pre-shared-key local VTI123
+  pre-shared-key remote VTI123
+  exit
+ crypto ikev2 profile VTI-IKEV2
+  match identity remote address 10.1.1.5 255.255.255.255
+  authentication local pre-share
+  authentication remote pre-share
+  keyring local VTI-KEYS
+  end
+```
+### IPsec in BSP-SanJuan
+```
+configure terminal
+ crypto ipsec transform-set VTI-SET esp-aes 256 esp-sha256-hmac
+  mode tunnel
+  exit
+ crypto ipsec profile VTI-PROFILE
+  set transform-set VTI-SET
+  set ikev2-profile VTI-IKEV2
+  end
+```
+### VTI Interface in BSP-SanJuan
+```
+configure terminal
+ interface Tunnel0
+  description VTI to Makati
+  ip address 192.168.100.1 255.255.255.252
+  tunnel source 10.1.1.1
+  tunnel destination 10.1.1.5
+  tunnel mode ipsec ipv4
+  tunnel protection ipsec profile VTI-PROFILE
+  ip mtu 1400
+  no shutdown
+  exit
+! Route to remote LAN via the Tunnel using Static Routing
+ ip route 172.16.20.0 255.255.255.0 192.168.100.2
+ end
+```
+### BSP-Makati
+```
+configure terminal
+ hostname BSPmakati
+ interface Ethernet0/1
+  description WAN to San Juan
+  ip address 10.1.1.5 255.255.255.252
+  no shutdown
+  exit
+ interface Ethernet0/0
+  description LAN B
+  ip address 172.16.20.1 255.255.255.0
+  no shutdown
+  end
+```
+### IKEv2 keying in BSP-Makati
+```
+configure terminal
+ crypto ikev2 proposal VTI-PROP
+  encryption aes-cvc-256
+  integrity sha256
+  group 14
+  exit
+ crypto ikev2 policy VTI-POLICY
+  proposal VTI-PROP
+  exit
+ crypto ikev2 keyring VTI-KEYS
+  peer SITEA
+  address 10.1.1.1
+  pre-shared-key local VTI123
+  pre-shared-key remote VTI123
+  exit
+ crypto ikev2 profile VTI-IKEV2
+  match identity remote address 10.1.1.1 255.255.255.255
+  authentication local pre-share
+  authentication remote pre-share
+  keyring local VTI-KEYS
+  end
+```
+### IPsec in BSP-Makati
+```
+configure terminal
+ crypto ipsec transform-set VTI-SET esp-aes esp-sha256-hmac
+  mode tunnel
+  exit
+ crypto ipsec profile VTI-PROFILE
+  set transform-set VTI-SET
+  set ikev2-profile VTI-IKEV2
+  end
+```
+### VTI Interface in BSP-SanJuan
+```
+configure terminal
+ interface Tunnel0
+  description VTI to San Juan
+  ip address 192.168.100.2 255.255.255.252
+  tunnel source 10.1.1.5
+  tunnel destination 10.1.1.1
+  tunnel mode ipsec ipv4
+  tunnel protection ipsec profile VTI-PROFILE
+  ip mtu 1400
+  no shutdown
+  exit
+! Route to remote LAN via the tunnel using Static Routing
+ ip routing 172.16.10.0 255.255.255.0 192.168.100.1
+ end
+```
+### How to Verify:
+```
+BSPsanjuan#show crypto ikev2 sa
+IPv4 Crypto IKEv2  SA 
+
+Tunnel-id Local                 Remote                fvrf/ivrf            Status 
+2         10.1.1.1/500          10.1.1.5/500          none/none            READY  
+      Encr: AES-CBC, keysize: 256, PRF: SHA256, Hash: SHA256, DH Grp:14, Auth sign: PSK, Auth verify: PSK
+      Life/Active Time: 86400/64 sec
+
+ IPv6 Crypto IKEv2  SA
 
 
-
-
-
-
-
-
-
+```
