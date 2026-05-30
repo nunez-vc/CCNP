@@ -71,10 +71,10 @@ write
 ### How to verify:
 ```
 @R10
-R10#ping vrf ENCOR 10.11.2.1 source e0/0.100
+R10#ping vrf ENCOR 10.11.2.1 source e0/0.10
 
 @R20
-R20#ping vrf ENCOR 10.10.1.1 source e0/0.101
+R20#ping vrf ENCOR 10.10.1.1 source e0/0.11
 ```
 
 ## Save the configurations: Do not forget this on exam
