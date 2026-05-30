@@ -24,7 +24,7 @@ configure terminal
     exit
   interface e0/1
     switchport mode access
-    switchport access vlan 100
+    switchport access vlan 10
     no shutdown
     end
 write
@@ -51,7 +51,7 @@ configure terminal
     exit
   interface e0/1
     switchport mode access
-    switchport access vlan 101
+    switchport access vlan 11
     end
 write
 ```
@@ -79,7 +79,7 @@ configure terminal
     no shutdown
     exit
   router ospf 100
-    router-id 1.1.1.
+    router-id 1.1.1.1
     end
 write
 ```
@@ -96,14 +96,14 @@ configure terminal
   line con 0
     exec-timeout 0 0
     exit
-  ip vrf CORP
+  ip vrf ENCOR
   interface e0/0
     no shutdown
     exit
-  interface e0/0.100
+  interface e0/0.10
     encapsulation dot1q 100
-    ip vrf forwarding CORP
-    ip add 10.100.1.1 255.255.255.0
+    ip vrf forwarding ENCOR
+    ip add 10.10.1.1 255.255.255.0
     no shutdown
     exit
   interface e0/1
@@ -127,8 +127,8 @@ configure terminal
   crypto ipsec profile MYPROFILE
   set transform-set MYSET
   interface tunnel0
-    ip vrf forwarding CORP
-    ip add 10.100.100.1 255.255.255.0
+    ip vrf forwarding ENCOR
+    ip add 10.10.10.1 255.255.255.0
     tunnel source Ethernet0/1
     no shutdown
     end
@@ -147,13 +147,13 @@ configure terminal
   line con 0
     exec-timeout 0 0
     exit
-  ip vrf CORP
+  ip vrf ENCOR
   interface e0/0
     no shut
-  interface 0/0.101
+  interface 0/0.11
     encapsulation dot1q 101
-    ip vrf forwarding CORP
-    ip add 10.101.2.1 255.255.255.0
+    ip vrf forwarding ENCOR
+    ip add 10.11.2.1 255.255.255.0
     no shutdown
     exit
   interface 0/2
@@ -177,8 +177,8 @@ configure terminal
   crypto ipsec profile MYPROFILE
   set transform-set MYSET
   interface tunnel0
-    ip vrf forwarding CORP
-    ip add 10.100.100.2 255.255.255.0
+    ip vrf forwarding ENCOR
+    ip add 10.10.10.2 255.255.255.0
     tunnel source Ethernet0/2
     no shutdown
     end
