@@ -8,6 +8,19 @@ configure terminal
  encryption <ENCRYPTION-ALGORITHM>
  integrity <HASH-ALGORITHM>
  group <DH-GROUP>
+
+encrpytion options:
+des
+3des
+aes-cbc-128/192/256
+aes-gcm-128/256
+
+integrity options:
+md5
+sha1/256/384/512
+
+group options:
+1,2,5,14,15,16,19,20,21,24
 ```
 
 ## IKEv2 Policy
